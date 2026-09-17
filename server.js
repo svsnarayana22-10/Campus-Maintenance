@@ -1,22 +1,35 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 const os = require("os");
 const { DatabaseSync } = require("node:sqlite");
 
 const app = express();
 
-// Parse JSON with larger limit for base64 image uploads (up to 10MB)
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Serve static files from the root project directory
-app.use(express.static(path.join(__dirname, "..")));
+let staticDir = path.join(__dirname, "..");
+if (!fs.existsSync(path.join(staticDir, "index.html"))) {
+    staticDir = __dirname;
+}
+app.use(express.static(staticDir));
 
-// Initialize SQLite database
+app.use((req, res, next) => {
+    const reqPath = req.path;
+    if (reqPath.startsWith("/pages/") || reqPath.startsWith("/css/")) {
+        const fileBasename = path.basename(reqPath);
+        const rootFilePath = path.join(__dirname, fileBasename);
+        if (fs.existsSync(rootFilePath)) {
+            return res.sendFile(rootFilePath);
+        }
+    }
+    next();
+});
+
 const dbPath = path.join(__dirname, "campus_maintenance.db");
 const db = new DatabaseSync(dbPath);
 
-// Initialize database tables
 function initDb() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS students (
@@ -87,9 +100,17 @@ function initDb() {
 
 initDb();
 
-// Routes
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "index.html"));
+    const parentIndex = path.join(__dirname, "..", "index.html");
+    const localIndex = path.join(__dirname, "index.html");
+    
+    if (fs.existsSync(parentIndex)) {
+        res.sendFile(parentIndex);
+    } else if (fs.existsSync(localIndex)) {
+        res.sendFile(localIndex);
+    } else {
+        res.send("Campus Maintenance Server is Running!");
+    }
 });
 
 app.post("/register", (req, res) => {
@@ -220,27 +241,7 @@ app.get("/stats", (req, res) => {
     }
 });
 
-// Auto-detect Local Wi-Fi IP Address
-function getLocalIpAddress() {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-        for (const net of interfaces[name]) {
-            if (net.family === 'IPv4' && !net.internal) {
-                return net.address;
-            }
-        }
-    }
-    return '127.0.0.1';
-}
-
 const PORT = process.env.PORT || 3000;
-const localIp = getLocalIpAddress();
-
-// Bind to '0.0.0.0' to accept connections from phones/other computers on the same Wi-Fi
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`===================================================`);
-    console.log(`🏫 Campus Maintenance Server Running!`);
-    console.log(`💻 On your Mac: http://localhost:${PORT}`);
-    console.log(`📱 On Mobile / Other Laptops (Same Wi-Fi): http://${localIp}:${PORT}`);
-    console.log(`===================================================`);
+    console.log(`Server running on port ${PORT}`);
 });
