@@ -4,303 +4,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Campus Maintenance</title>
+    <title>Admin Login - Campus Maintenance</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <header class="dashboard-header admin-header">
-        <div class="logo">
-            🛡️ Admin Portal - Campus Maintenance
-        </div>
-        <div class="user-info">
-            <span id="adminWelcome">Welcome, Admin</span>
-            <button id="logoutBtn" class="btn-logout">Logout</button>
-        </div>
-    </header>
+    <div class="login-container">
+        <div class="login-box admin-box">
+            <h1>Admin Portal Login</h1>
+            <p>Authorized access for Maintenance Staff & Management</p>
 
-    <div class="dashboard-container">
-
-        <!-- Overview Stat Cards -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon icon-total">📊</div>
-                <div class="stat-content">
-                    <h3 id="statTotal">0</h3>
-                    <p>Total Issues</p>
-                </div>
+            <div class="demo-badge">
+                💡 <strong>Demo Credentials for Review:</strong><br>
+                Email: <code>admin@campus.edu</code> | Password: <code>admin123</code>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-icon icon-pending">⏳</div>
-                <div class="stat-content">
-                    <h3 id="statPending">0</h3>
-                    <p>Pending Issues</p>
-                </div>
+            <div id="alertMessage" class="alert-box" style="display: none;"></div>
+
+            <form id="adminLoginForm">
+                <label for="email">Admin Email</label>
+                <input type="email" id="email" value="admin@campus.edu" placeholder="Enter admin email" required>
+
+                <label for="password">Password</label>
+                <input type="password" id="password" value="admin123" placeholder="Enter admin password" required>
+
+                <button type="submit" class="btn-admin">Login as Admin</button>
+            </form>
+
+            <div class="back-home">
+                <a href="../index.html">← Back to Home</a>
             </div>
-
-            <div class="stat-card">
-                <div class="stat-icon icon-progress">🔄</div>
-                <div class="stat-content">
-                    <h3 id="statInProgress">0</h3>
-                    <p>In Progress</p>
-                </div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon icon-resolved">✅</div>
-                <div class="stat-content">
-                    <h3 id="statResolved">0</h3>
-                    <p>Resolved Issues</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Master Complaints List -->
-        <div class="dashboard-card margin-top">
-            <div class="section-header">
-                <h2>🛠️ Department Complaints Management</h2>
-                
-                <div class="filter-controls" style="flex-wrap: wrap; gap: 10px;">
-                    <!-- Academic Department / Branch Filter -->
-                    <select id="branchFilter" class="status-select" style="padding: 7px 12px; font-weight: 700; border-color: #2563eb;">
-                        <option value="all">🎓 All Academic Branches</option>
-                        <option value="CSE">💻 CSE Department</option>
-                        <option value="ECE">📡 ECE Department</option>
-                        <option value="EEE">⚡ EEE Department</option>
-                        <option value="MECH">⚙️ Mechanical Department</option>
-                        <option value="CIVIL">🏗️ Civil Department</option>
-                        <option value="General">🏫 Hostel & Campus General</option>
-                    </select>
-
-                    <!-- Issue Category Filter -->
-                    <select id="categoryFilter" class="status-select" style="padding: 7px 12px; font-weight: 700;">
-                        <option value="all">🏬 All Issue Types</option>
-                        <option value="Fan">🌀 Fans</option>
-                        <option value="Light">💡 Lights</option>
-                        <option value="Water">🚰 Water & Plumbing</option>
-                        <option value="Furniture">🪑 Furniture & Desks</option>
-                        <option value="WiFi">📶 Wi-Fi / Internet</option>
-                        <option value="Other">🛠️ Other</option>
-                    </select>
-
-                    <!-- Status Filter Buttons -->
-                    <button class="filter-btn active" data-status="all">All Status</button>
-                    <button class="filter-btn" data-status="Pending">Pending</button>
-                    <button class="filter-btn" data-status="In Progress">In Progress</button>
-                    <button class="filter-btn" data-status="Resolved">Resolved</button>
-                </div>
-            </div>
-
-            <div id="actionAlert" class="alert-box" style="display: none;"></div>
-
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Photo</th>
-                            <th>Branch</th>
-                            <th>Student</th>
-                            <th>Roll No</th>
-                            <th>Category</th>
-                            <th>Location</th>
-                            <th>Urgency</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                            <th>Update Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminComplaintsTable">
-                        <tr>
-                            <td colspan="11" class="text-center">Loading complaints...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- Image Modal Preview -->
-    <div id="imageModal" class="modal" onclick="closeImageModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <span class="close-modal" onclick="closeImageModal()">&times;</span>
-            <img id="modalImg" src="" alt="Full Complaint Photo">
         </div>
     </div>
 
     <script>
-        // Session Check
-        const adminData = localStorage.getItem("admin");
-        if (!adminData) {
-            window.location.href = "admin-login.html";
-        }
-        const admin = JSON.parse(adminData);
-        document.getElementById("adminWelcome").textContent = `👤 Admin: ${admin.email}`;
+        document.getElementById("adminLoginForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
 
-        // Logout
-        document.getElementById("logoutBtn").addEventListener("click", () => {
-            localStorage.removeItem("admin");
-            window.location.href = "admin-login.html";
-        });
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const alertBox = document.getElementById("alertMessage");
 
-        let allComplaints = [];
-        let currentStatusFilter = "all";
-        let currentBranchFilter = "all";
-        let currentCategoryFilter = "all";
-
-        // Image Modal Handlers
-        window.openImageModal = function(src) {
-            document.getElementById("modalImg").src = src;
-            document.getElementById("imageModal").style.display = "flex";
-        };
-
-        window.closeImageModal = function() {
-            document.getElementById("imageModal").style.display = "none";
-        };
-
-        // Load Stats
-        async function loadStats() {
-            try {
-                const response = await fetch("/stats");
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById("statTotal").textContent = data.stats.total;
-                    document.getElementById("statPending").textContent = data.stats.pending;
-                    document.getElementById("statInProgress").textContent = data.stats.inProgress;
-                    document.getElementById("statResolved").textContent = data.stats.resolved;
-                }
-            } catch (err) {
-                console.error("Error loading stats:", err);
-            }
-        }
-
-        // Load Complaints List
-        async function loadComplaints() {
-            const tableBody = document.getElementById("adminComplaintsTable");
-            try {
-                const response = await fetch("/complaints");
-                const data = await response.json();
-
-                if (data.success) {
-                    allComplaints = data.complaints;
-                    renderTable();
-                } else {
-                    tableBody.innerHTML = `<tr><td colspan="11" class="text-center text-muted">Failed to load complaints.</td></tr>`;
-                }
-            } catch (err) {
-                tableBody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">Server connection error.</td></tr>`;
-            }
-        }
-
-        function renderTable() {
-            const tableBody = document.getElementById("adminComplaintsTable");
-            let filtered = allComplaints;
-
-            // Apply Branch Filter
-            if (currentBranchFilter !== "all") {
-                filtered = filtered.filter(c => (c.department || 'CSE') === currentBranchFilter);
-            }
-
-            // Apply Category Filter
-            if (currentCategoryFilter !== "all") {
-                filtered = filtered.filter(c => c.category === currentCategoryFilter);
-            }
-
-            // Apply Status Filter
-            if (currentStatusFilter !== "all") {
-                filtered = filtered.filter(c => c.status === currentStatusFilter);
-            }
-
-            if (filtered.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="11" class="text-center text-muted">No complaints found for selected filters.</td></tr>`;
-                return;
-            }
-
-            tableBody.innerHTML = filtered.map(c => `
-                <tr>
-                    <td>#${c.id}</td>
-                    <td>${c.image_url ? `<img src="${c.image_url}" class="table-thumb" onclick="openImageModal('${c.image_url}')" title="Click to enlarge">` : '<span class="text-muted">No Photo</span>'}</td>
-                    <td><span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:800;">${c.department || 'CSE'}</span></td>
-                    <td>${c.student_name || 'Student'}</td>
-                    <td><strong>${c.roll_number || 'N/A'}</strong></td>
-                    <td>${c.category}</td>
-                    <td>${c.location}</td>
-                    <td><span class="badge urgency-${c.urgency ? c.urgency.toLowerCase() : 'medium'}">${c.urgency || 'Medium'}</span></td>
-                    <td>${c.description}</td>
-                    <td><span class="badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span></td>
-                    <td>
-                        <select class="status-select" onchange="window.updateStatus(${c.id}, this.value)">
-                            <option value="Pending" ${c.status === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
-                            <option value="In Progress" ${c.status === 'In Progress' ? 'selected' : ''}>🔄 In Progress</option>
-                            <option value="Resolved" ${c.status === 'Resolved' ? 'selected' : ''}>✅ Resolved</option>
-                        </select>
-                    </td>
-                </tr>
-            `).join("");
-        }
-
-        // Update Status Handler
-        window.updateStatus = async function(complaintId, newStatus) {
-            const actionAlert = document.getElementById("actionAlert");
-            actionAlert.style.display = "none";
+            alertBox.style.display = "none";
 
             try {
-                const response = await fetch("/complaints/update-status", {
+                const response = await fetch("/admin-login", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ complaint_id: Number(complaintId), status: newStatus })
+                    body: JSON.stringify({ email: email, password: password })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    actionAlert.className = "alert-box success";
-                    actionAlert.textContent = `Complaint #${complaintId} status changed to '${newStatus}'.`;
-                    actionAlert.style.display = "block";
-                    loadStats();
-                    loadComplaints();
+                    localStorage.setItem("admin", JSON.stringify(data.admin));
+                    alertBox.className = "alert-box success";
+                    alertBox.textContent = "Admin Login Successful! Redirecting...";
+                    alertBox.style.display = "block";
+
+                    setTimeout(() => {
+                        window.location.href = "admin-dashboard.html";
+                    }, 500);
                 } else {
-                    actionAlert.className = "alert-box error";
-                    actionAlert.textContent = data.message || "Failed to update status";
-                    actionAlert.style.display = "block";
+                    alertBox.className = "alert-box error";
+                    alertBox.textContent = data.message || "Invalid admin credentials";
+                    alertBox.style.display = "block";
                 }
             } catch (err) {
-                actionAlert.className = "alert-box error";
-                actionAlert.textContent = "Server error while updating status";
-                actionAlert.style.display = "block";
+                alertBox.className = "alert-box error";
+                alertBox.textContent = "Server connection error. Please ensure server is running.";
+                alertBox.style.display = "block";
             }
-        };
-
-        // Branch Filter Listener
-        document.getElementById("branchFilter").addEventListener("change", function() {
-            currentBranchFilter = this.value;
-            renderTable();
         });
-
-        // Category Filter Listener
-        document.getElementById("categoryFilter").addEventListener("change", function() {
-            currentCategoryFilter = this.value;
-            renderTable();
-        });
-
-        // Status Filter Buttons Listener
-        document.querySelectorAll(".filter-btn").forEach(btn => {
-            btn.addEventListener("click", function() {
-                document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-                this.classList.add("active");
-                currentStatusFilter = this.getAttribute("data-status");
-                renderTable();
-            });
-        });
-
-        // Initial Load
-        loadStats();
-        loadComplaints();
     </script>
 
 </body>

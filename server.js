@@ -36,6 +36,7 @@ function initDb() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             roll_number TEXT NOT NULL UNIQUE,
+            department TEXT DEFAULT 'CSE',
             email TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -53,6 +54,7 @@ function initDb() {
             student_id INTEGER NOT NULL,
             student_name TEXT NOT NULL,
             roll_number TEXT NOT NULL,
+            department TEXT DEFAULT 'CSE',
             category TEXT NOT NULL,
             location TEXT NOT NULL,
             urgency TEXT DEFAULT 'Medium',
@@ -64,9 +66,9 @@ function initDb() {
         );
     `);
 
-    try {
-        db.exec("ALTER TABLE complaints ADD COLUMN image_url TEXT");
-    } catch (e) {}
+    try { db.exec("ALTER TABLE students ADD COLUMN department TEXT DEFAULT 'CSE'"); } catch (e) {}
+    try { db.exec("ALTER TABLE complaints ADD COLUMN image_url TEXT"); } catch (e) {}
+    try { db.exec("ALTER TABLE complaints ADD COLUMN department TEXT DEFAULT 'CSE'"); } catch (e) {}
 
     const checkAdmin = db.prepare("SELECT * FROM admins WHERE email = ?").get("admin@campus.edu");
     if (!checkAdmin) {
@@ -80,21 +82,24 @@ function initDb() {
     const checkStudent = db.prepare("SELECT * FROM students WHERE email = ?").get("john@student.edu");
     if (!checkStudent) {
         const studentResult = db.prepare(
-            "INSERT INTO students (name, roll_number, email, password) VALUES (?, ?, ?, ?)"
-        ).run("John Doe", "24CS001", "john@student.edu", "student123");
+            "INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)"
+        ).run("John Doe", "24CS001", "CSE", "john@student.edu", "student123");
 
         const studentId = studentResult.lastInsertRowid;
         const sampleFanPhoto = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23e2e8f0'/><text x='50%' y='45%' dominant-baseline='middle' text-anchor='middle' font-size='48'>🌀</text><text x='50%' y='70%' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%23475569'>Damaged Fan Photo</text></svg>";
 
-        db.prepare(`
-            INSERT INTO complaints (student_id, student_name, roll_number, category, location, urgency, description, image_url, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(studentId, "John Doe", "24CS001", "Fan", "Block A - Room 102", "High", "Ceiling fan making loud noise.", sampleFanPhoto, "Pending");
+        const insertStmt = db.prepare(`
+            INSERT INTO complaints (student_id, student_name, roll_number, department, category, location, urgency, description, image_url, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
 
-        db.prepare(`
-            INSERT INTO complaints (student_id, student_name, roll_number, category, location, urgency, description, image_url, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(studentId, "John Doe", "24CS001", "Light", "Lab 3 - Desk 12", "Medium", "Tubelight flickering continuously.", null, "In Progress");
+        insertStmt.run(studentId, "John Doe", "24CS001", "CSE", "Fan", "CS Lab 1 - Room 204", "High", "Ceiling fan making loud noise.", sampleFanPhoto, "Pending");
+        insertStmt.run(studentId, "John Doe", "24CS001", "CSE", "Light", "CS Lab 3 - Desk 12", "Medium", "Tubelight flickering continuously.", null, "In Progress");
+        insertStmt.run(studentId, "John Doe", "24CS001", "ECE", "WiFi", "ECE Block - DSP Lab", "High", "Wi-Fi router disconnected in lab.", null, "Pending");
+        insertStmt.run(studentId, "John Doe", "24CS001", "EEE", "Light", "Electrical Machine Lab", "High", "Main circuit breaker light tripping.", null, "In Progress");
+        insertStmt.run(studentId, "John Doe", "24CS001", "MECH", "Furniture", "Workshop - Bench 4", "Medium", "Desk wooden leg broken.", null, "Resolved");
+        insertStmt.run(studentId, "John Doe", "24CS001", "CIVIL", "Water", "Civil Block 2nd Floor", "Medium", "Water tap leaking in washroom.", null, "Pending");
+        insertStmt.run(studentId, "John Doe", "24CS001", "General", "Water", "Hostel Block B", "High", "Water cooler not cooling water.", null, "Pending");
     }
 }
 
@@ -114,14 +119,14 @@ app.get("/", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-    const { name, roll_number, email, password } = req.body;
+    const { name, roll_number, department, email, password } = req.body;
     if (!name || !roll_number || !email || !password) {
         return res.status(400).json({ success: false, message: "All fields are required" });
     }
 
     try {
-        const stmt = db.prepare("INSERT INTO students (name, roll_number, email, password) VALUES (?, ?, ?, ?)");
-        stmt.run(name, roll_number, email, password);
+        const stmt = db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)");
+        stmt.run(name, roll_number, department || "CSE", email, password);
         return res.json({ success: true, message: "Registration successful! Please login." });
     } catch (err) {
         if (err.message && err.message.includes("UNIQUE")) {
@@ -138,7 +143,7 @@ app.post("/login", (req, res) => {
     }
 
     try {
-        const student = db.prepare("SELECT id, name, roll_number, email FROM students WHERE email = ? AND password = ?").get(email, password);
+        const student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE email = ? AND password = ?").get(email, password);
         if (!student) {
             return res.status(401).json({ success: false, message: "Invalid email or password" });
         }
@@ -181,20 +186,21 @@ app.get("/complaints", (req, res) => {
 });
 
 app.post("/complaints/create", (req, res) => {
-    const { student_id, student_name, roll_number, category, location, urgency, description, image_url } = req.body;
+    const { student_id, student_name, roll_number, department, category, location, urgency, description, image_url } = req.body;
     if (!student_id || !category || !location || !description) {
         return res.status(400).json({ success: false, message: "Missing required complaint details" });
     }
 
     try {
         const stmt = db.prepare(`
-            INSERT INTO complaints (student_id, student_name, roll_number, category, location, urgency, description, image_url, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            INSERT INTO complaints (student_id, student_name, roll_number, department, category, location, urgency, description, image_url, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
         `);
         stmt.run(
             Number(student_id),
             student_name || "Student",
             roll_number || "N/A",
+            department || "CSE",
             category,
             location,
             urgency || "Medium",

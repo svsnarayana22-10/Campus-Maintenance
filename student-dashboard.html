@@ -6,9 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard - Campus Maintenance</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="style.css">
 
-    <!-- STRICT AUTHENTICATION GUARD -->
+    <!-- STRICT AUTHENTICATION GUARD (Executes BEFORE page rendering) -->
     <script>
         const studentSession = localStorage.getItem("student");
         if (!studentSession) {
@@ -42,7 +41,7 @@
                 <div class="form-group">
                     <label for="department">Academic Department / Branch</label>
                     <select id="department" required>
-                        <option value="CSE" selected>💻 CSE (Computer Science)</option>
+                        <option value="CSE">💻 CSE (Computer Science)</option>
                         <option value="ECE">📡 ECE (Electronics)</option>
                         <option value="EEE">⚡ EEE (Electrical)</option>
                         <option value="MECH">⚙️ Mechanical</option>
@@ -136,20 +135,24 @@
     </div>
 
     <script>
+        // Un-hide body once authentication is confirmed
         document.body.style.display = "block";
 
         const student = JSON.parse(localStorage.getItem("student"));
         document.getElementById("studentWelcome").textContent = `👤 ${student.name} (${student.roll_number})`;
 
-        if (student && student.department) {
+        // Auto-select student's registered department in form
+        if (student.department) {
             document.getElementById("department").value = student.department;
         }
 
+        // Logout Button
         document.getElementById("logoutBtn").addEventListener("click", () => {
             localStorage.removeItem("student");
             window.location.replace("student-login.html");
         });
 
+        // Load Complaints
         async function loadComplaints() {
             const tableBody = document.getElementById("complaintsTableBody");
             try {
@@ -199,6 +202,7 @@
             document.getElementById("imageModal").style.display = "none";
         };
 
+        // Submit Complaint Form
         document.getElementById("complaintForm").addEventListener("submit", async function(e) {
             e.preventDefault();
 
@@ -238,7 +242,7 @@
                     formAlert.textContent = "Complaint submitted successfully!";
                     formAlert.style.display = "block";
                     document.getElementById("complaintForm").reset();
-                    if (student && student.department) {
+                    if (student.department) {
                         document.getElementById("department").value = student.department;
                     }
                     loadComplaints();
