@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Campus Maintenance</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body>
+
+    <header class="dashboard-header admin-header">
+        <div class="logo">
+            🛡️ Admin Portal - Campus Maintenance
+        </div>
+        <div class="user-info">
+            <span id="adminWelcome">Welcome, Admin</span>
+            <button id="logoutBtn" class="btn-logout">Logout</button>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+
+        <!-- Overview Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon icon-total">📊</div>
+                <div class="stat-content">
+                    <h3 id="statTotal">0</h3>
+                    <p>Total Issues</p>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon icon-pending">⏳</div>
+                <div class="stat-content">
+                    <h3 id="statPending">0</h3>
+                    <p>Pending Issues</p>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon icon-progress">🔄</div>
+                <div class="stat-content">
+                    <h3 id="statInProgress">0</h3>
+                    <p>In Progress</p>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon icon-resolved">✅</div>
+                <div class="stat-content">
+                    <h3 id="statResolved">0</h3>
+                    <p>Resolved Issues</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Complaints List -->
+        <div class="dashboard-card margin-top">
+            <div class="section-header">
+                <h2>🛠️ All Campus Maintenance Complaints</h2>
+                <div class="filter-controls">
+                    <button class="filter-btn active" data-status="all">All</button>
+                    <button class="filter-btn" data-status="Pending">Pending</button>
+                    <button class="filter-btn" data-status="In Progress">In Progress</button>
+                    <button class="filter-btn" data-status="Resolved">Resolved</button>
+                </div>
+            </div>
+
+            <div id="actionAlert" class="alert-box" style="display: none;"></div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Photo</th>
+                            <th>Student</th>
+                            <th>Roll No</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Urgency</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Update Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminComplaintsTable">
+                        <tr>
+                            <td colspan="10" class="text-center">Loading complaints...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Image Modal Preview -->
+    <div id="imageModal" class="modal" onclick="closeImageModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeImageModal()">&times;</span>
+            <img id="modalImg" src="" alt="Full Complaint Photo">
+        </div>
+    </div>
+
+    <script>
+        // Session Check
+        const adminData = localStorage.getItem("admin");
+        if (!adminData) {
+            window.location.href = "admin-login.html";
+        }
+        const admin = JSON.parse(adminData);
+        document.getElementById("adminWelcome").textContent = `👤 Admin: ${admin.email}`;
+
+        // Logout
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("admin");
+            window.location.href = "admin-login.html";
+        });
+
+        let allComplaints = [];
+        let currentFilter = "all";
+
+        // Image Modal Handlers
+        window.openImageModal = function(src) {
+            document.getElementById("modalImg").src = src;
+            document.getElementById("imageModal").style.display = "flex";
+        };
+
+        window.closeImageModal = function() {
+            document.getElementById("imageModal").style.display = "none";
+        };
+
+        // Load Stats
+        async function loadStats() {
+            try {
+                const response = await fetch("/stats");
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById("statTotal").textContent = data.stats.total;
+                    document.getElementById("statPending").textContent = data.stats.pending;
+                    document.getElementById("statInProgress").textContent = data.stats.inProgress;
+                    document.getElementById("statResolved").textContent = data.stats.resolved;
+                }
+            } catch (err) {
+                console.error("Error loading stats:", err);
+            }
+        }
+
+        // Load Complaints List
+        async function loadComplaints() {
+            const tableBody = document.getElementById("adminComplaintsTable");
+            try {
+                const response = await fetch("/complaints");
+                const data = await response.json();
+
+                if (data.success) {
+                    allComplaints = data.complaints;
+                    renderTable();
+                } else {
+                    tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">Failed to load complaints.</td></tr>`;
+                }
+            } catch (err) {
+                tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">Server connection error.</td></tr>`;
+            }
+        }
+
+        function renderTable() {
+            const tableBody = document.getElementById("adminComplaintsTable");
+            let filtered = allComplaints;
+
+            if (currentFilter !== "all") {
+                filtered = allComplaints.filter(c => c.status === currentFilter);
+            }
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">No complaints found.</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = filtered.map(c => `
+                <tr>
+                    <td>#${c.id}</td>
+                    <td>${c.image_url ? `<img src="${c.image_url}" class="table-thumb" onclick="openImageModal('${c.image_url}')" title="Click to enlarge">` : '<span class="text-muted">No Photo</span>'}</td>
+                    <td>${c.student_name || 'Student'}</td>
+                    <td><strong>${c.roll_number || 'N/A'}</strong></td>
+                    <td>${c.category}</td>
+                    <td>${c.location}</td>
+                    <td><span class="badge urgency-${c.urgency ? c.urgency.toLowerCase() : 'medium'}">${c.urgency || 'Medium'}</span></td>
+                    <td>${c.description}</td>
+                    <td><span class="badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span></td>
+                    <td>
+                        <select class="status-select" onchange="window.updateStatus(${c.id}, this.value)">
+                            <option value="Pending" ${c.status === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
+                            <option value="In Progress" ${c.status === 'In Progress' ? 'selected' : ''}>🔄 In Progress</option>
+                            <option value="Resolved" ${c.status === 'Resolved' ? 'selected' : ''}>✅ Resolved</option>
+                        </select>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        // Update Complaint Status Action
+        window.updateStatus = async function(complaintId, newStatus) {
+            const actionAlert = document.getElementById("actionAlert");
+            actionAlert.style.display = "none";
+
+            try {
+                const response = await fetch("/complaints/update-status", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ complaint_id: Number(complaintId), status: newStatus })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    actionAlert.className = "alert-box success";
+                    actionAlert.textContent = `Complaint #${complaintId} status changed to '${newStatus}'.`;
+                    actionAlert.style.display = "block";
+                    loadStats();
+                    loadComplaints();
+                } else {
+                    actionAlert.className = "alert-box error";
+                    actionAlert.textContent = data.message || "Failed to update status";
+                    actionAlert.style.display = "block";
+                }
+            } catch (err) {
+                actionAlert.className = "alert-box error";
+                actionAlert.textContent = "Server error while updating status";
+                actionAlert.style.display = "block";
+            }
+        };
+
+        // Filter Buttons Event Listener
+        document.querySelectorAll(".filter-btn").forEach(btn => {
+            btn.addEventListener("click", function() {
+                document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+                this.classList.add("active");
+                currentFilter = this.getAttribute("data-status");
+                renderTable();
+            });
+        });
+
+        // Initial Load
+        loadStats();
+        loadComplaints();
+    </script>
+
+</body>
+
+</html>

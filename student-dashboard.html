@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Campus Maintenance</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body>
+
+    <header class="dashboard-header">
+        <div class="logo">
+            🏫 Student Portal
+        </div>
+        <div class="user-info">
+            <span id="studentWelcome">Welcome, Student</span>
+            <button id="logoutBtn" class="btn-logout">Logout</button>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+
+        <!-- Report Issue Form Card -->
+        <div class="dashboard-card">
+            <h2>📢 Report a New Maintenance Issue</h2>
+            <p class="subtitle">Submit details of any maintenance problem in classrooms, labs, or hostels.</p>
+
+            <div id="formAlert" class="alert-box" style="display: none;"></div>
+
+            <form id="complaintForm" class="grid-form">
+                <div class="form-group">
+                    <label for="category">Issue Category</label>
+                    <select id="category" required>
+                        <option value="">-- Select Category --</option>
+                        <option value="Fan">🌀 Fan / Ventilation</option>
+                        <option value="Light">💡 Light / Electrical</option>
+                        <option value="Water">🚰 Water / Plumbing</option>
+                        <option value="Furniture">🪑 Furniture / Desk</option>
+                        <option value="WiFi">📶 Wi-Fi / Internet</option>
+                        <option value="Other">🛠️ Other Maintenance</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Location / Room Number</label>
+                    <input type="text" id="location" placeholder="e.g., Block A - Room 204 or CS Lab 1" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="urgency">Urgency Level</label>
+                    <select id="urgency" required>
+                        <option value="Low">🟢 Low Priority</option>
+                        <option value="Medium" selected>🟡 Medium Priority</option>
+                        <option value="High">🔴 High Priority (Emergency)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="issueImage">📷 Attach Photo of Issue (Optional)</label>
+                    <input type="file" id="issueImage" accept="image/*">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="description">Detailed Description</label>
+                    <textarea id="description" rows="3" placeholder="Describe the issue clearly (e.g. Fan knob broken, light flickering)..." required></textarea>
+                </div>
+
+                <div class="form-group full-width">
+                    <button type="submit" class="btn">Submit Complaint</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- My Complaints History -->
+        <div class="dashboard-card margin-top">
+            <div class="section-header">
+                <h2>📋 My Reported Complaints</h2>
+                <button id="refreshBtn" class="btn-sm">🔄 Refresh List</button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Photo</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Urgency</th>
+                            <th>Description</th>
+                            <th>Date Reported</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="complaintsTableBody">
+                        <tr>
+                            <td colspan="8" class="text-center">Loading complaints...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Image Modal Preview -->
+    <div id="imageModal" class="modal" onclick="closeImageModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeImageModal()">&times;</span>
+            <img id="modalImg" src="" alt="Full Complaint Photo">
+        </div>
+    </div>
+
+    <script>
+        // Check Session
+        const studentData = localStorage.getItem("student");
+        if (!studentData) {
+            window.location.href = "student-login.html";
+        }
+        const student = JSON.parse(studentData);
+        document.getElementById("studentWelcome").textContent = `👤 ${student.name} (${student.roll_number})`;
+
+        // Logout
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("student");
+            window.location.href = "student-login.html";
+        });
+
+        // Load Complaints
+        async function loadComplaints() {
+            const tableBody = document.getElementById("complaintsTableBody");
+            try {
+                const response = await fetch(`/complaints?student_id=${student.id}`);
+                const data = await response.json();
+
+                if (data.success && data.complaints.length > 0) {
+                    tableBody.innerHTML = data.complaints.map(c => `
+                        <tr>
+                            <td>#${c.id}</td>
+                            <td>${c.image_url ? `<img src="${c.image_url}" class="table-thumb" onclick="openImageModal('${c.image_url}')" title="Click to enlarge">` : '<span class="text-muted">No Photo</span>'}</td>
+                            <td><strong>${c.category}</strong></td>
+                            <td>${c.location}</td>
+                            <td><span class="badge urgency-${c.urgency ? c.urgency.toLowerCase() : 'medium'}">${c.urgency || 'Medium'}</span></td>
+                            <td>${c.description}</td>
+                            <td>${new Date(c.created_at).toLocaleDateString()}</td>
+                            <td><span class="badge status-${c.status.toLowerCase().replace(' ', '-')}">${c.status}</span></td>
+                        </tr>
+                    `).join("");
+                } else {
+                    tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No complaints submitted yet.</td></tr>`;
+                }
+            } catch (err) {
+                tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Error loading complaints. Please try again.</td></tr>`;
+            }
+        }
+
+        document.getElementById("refreshBtn").addEventListener("click", loadComplaints);
+
+        // Helper to convert uploaded File to Base64 data URL
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) return resolve(null);
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        // Image Modal Handler
+        window.openImageModal = function(src) {
+            document.getElementById("modalImg").src = src;
+            document.getElementById("imageModal").style.display = "flex";
+        };
+
+        window.closeImageModal = function() {
+            document.getElementById("imageModal").style.display = "none";
+        };
+
+        // Submit Complaint Form
+        document.getElementById("complaintForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const category = document.getElementById("category").value;
+            const location = document.getElementById("location").value.trim();
+            const urgency = document.getElementById("urgency").value;
+            const description = document.getElementById("description").value.trim();
+            const imageFile = document.getElementById("issueImage").files[0];
+            const formAlert = document.getElementById("formAlert");
+
+            formAlert.style.display = "none";
+
+            try {
+                const image_url = await fileToBase64(imageFile);
+
+                const response = await fetch("/complaints/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        student_id: student.id,
+                        student_name: student.name,
+                        roll_number: student.roll_number,
+                        category: category,
+                        location: location,
+                        urgency: urgency,
+                        description: description,
+                        image_url: image_url
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    formAlert.className = "alert-box success";
+                    formAlert.textContent = "Complaint submitted successfully!";
+                    formAlert.style.display = "block";
+                    document.getElementById("complaintForm").reset();
+                    loadComplaints();
+                } else {
+                    formAlert.className = "alert-box error";
+                    formAlert.textContent = data.message || "Failed to submit complaint";
+                    formAlert.style.display = "block";
+                }
+            } catch (err) {
+                formAlert.className = "alert-box error";
+                formAlert.textContent = "Server connection error.";
+                formAlert.style.display = "block";
+            }
+        });
+
+        // Initial Load
+        loadComplaints();
+    </script>
+</body>
+
+</html>

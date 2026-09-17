@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Login - Campus Maintenance</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body>
+
+    <div class="login-container">
+        <div class="login-box">
+            <h1>Student Login</h1>
+            <p>Login to report and track maintenance issues</p>
+
+            <div id="alertMessage" class="alert-box" style="display: none;"></div>
+
+            <form id="loginForm">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="Enter student email (e.g., john@student.edu)" required>
+
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter password (e.g., student123)" required>
+
+                <button type="submit">Login to Dashboard</button>
+            </form>
+
+            <p class="register-text">
+                Don't have an account?
+                <a href="student-register.html">Register here</a>
+            </p>
+
+            <div class="back-home">
+                <a href="../index.html">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("loginForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const alertBox = document.getElementById("alertMessage");
+
+            alertBox.style.display = "none";
+
+            try {
+                const response = await fetch("/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Save student details in local storage session
+                    localStorage.setItem("student", JSON.stringify(data.student));
+                    alertBox.className = "alert-box success";
+                    alertBox.textContent = "Login Successful! Redirecting...";
+                    alertBox.style.display = "block";
+
+                    setTimeout(() => {
+                        window.location.href = "student-dashboard.html";
+                    }, 1000);
+                } else {
+                    alertBox.className = "alert-box error";
+                    alertBox.textContent = data.message || "Invalid email or password";
+                    alertBox.style.display = "block";
+                }
+            } catch (err) {
+                alertBox.className = "alert-box error";
+                alertBox.textContent = "Server connection error. Please ensure server is running.";
+                alertBox.style.display = "block";
+            }
+        });
+    </script>
+
+</body>
+
+</html>

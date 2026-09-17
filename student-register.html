@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration - Campus Maintenance</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body>
+
+    <div class="login-container">
+        <div class="login-box">
+            <h1>Student Registration</h1>
+            <p>Create your student account</p>
+
+            <div id="alertMessage" class="alert-box" style="display: none;"></div>
+
+            <form id="registerForm">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" placeholder="Enter full name" required>
+
+                <label for="roll_number">Roll Number / Student ID</label>
+                <input type="text" id="roll_number" placeholder="Enter roll number (e.g., 24CS101)" required>
+
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="Enter campus email" required>
+
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Create a password" required>
+
+                <button type="submit">Create Account</button>
+            </form>
+
+            <p class="register-text">
+                Already have an account?
+                <a href="student-login.html">Login here</a>
+            </p>
+
+            <div class="back-home">
+                <a href="../index.html">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("registerForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            const name = document.getElementById("name").value.trim();
+            const roll_number = document.getElementById("roll_number").value.trim();
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const alertBox = document.getElementById("alertMessage");
+
+            alertBox.style.display = "none";
+
+            try {
+                const response = await fetch("/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, roll_number, email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alertBox.className = "alert-box success";
+                    alertBox.textContent = data.message;
+                    alertBox.style.display = "block";
+
+                    setTimeout(() => {
+                        window.location.href = "student-login.html";
+                    }, 1500);
+                } else {
+                    alertBox.className = "alert-box error";
+                    alertBox.textContent = data.message || "Registration failed";
+                    alertBox.style.display = "block";
+                }
+            } catch (err) {
+                alertBox.className = "alert-box error";
+                alertBox.textContent = "Server connection error. Please ensure server is running.";
+                alertBox.style.display = "block";
+            }
+        });
+    </script>
+
+</body>
+
+</html>
