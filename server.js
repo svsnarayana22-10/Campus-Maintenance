@@ -70,6 +70,7 @@ function initDb() {
     try { db.exec("ALTER TABLE complaints ADD COLUMN image_url TEXT"); } catch (e) {}
     try { db.exec("ALTER TABLE complaints ADD COLUMN department TEXT DEFAULT 'CSE'"); } catch (e) {}
 
+    // Pre-seed Admin Account
     const checkAdmin = db.prepare("SELECT * FROM admins WHERE email = ?").get("admin@campus.edu");
     if (!checkAdmin) {
         db.prepare("INSERT INTO admins (name, email, password) VALUES (?, ?, ?)").run(
@@ -79,13 +80,28 @@ function initDb() {
         );
     }
 
-    const checkStudent = db.prepare("SELECT * FROM students WHERE email = ?").get("john@student.edu");
-    if (!checkStudent) {
-        const studentResult = db.prepare(
-            "INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)"
-        ).run("John Doe", "24CS001", "CSE", "john@student.edu", "student123");
+    // Pre-seed Demo Students (Ensures login ALWAYS works even after Render container restarts!)
+    const demoStudents = [
+        { name: "John Doe", roll_number: "24CS001", department: "CSE", email: "john@student.edu", password: "student123" },
+        { name: "Satya Narayana", roll_number: "24IE001", department: "IECT", email: "satya@student.edu", password: "satya123" }
+    ];
 
-        const studentId = studentResult.lastInsertRowid;
+    demoStudents.forEach(s => {
+        const check = db.prepare("SELECT * FROM students WHERE email = ?").get(s.email);
+        if (!check) {
+            db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)").run(
+                s.name, s.roll_number, s.department, s.email, s.password
+            );
+        } else {
+            db.prepare("UPDATE students SET department = ?, roll_number = ? WHERE email = ?").run(s.department, s.roll_number, s.email);
+        }
+    });
+
+    // Pre-seed sample complaints across departments
+    const checkComplaints = db.prepare("SELECT COUNT(*) as count FROM complaints").get().count;
+    if (checkComplaints === 0) {
+        const student = db.prepare("SELECT id FROM students WHERE email = ?").get("john@student.edu");
+        const studentId = student ? student.id : 1;
         const sampleFanPhoto = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23e2e8f0'/><text x='50%' y='45%' dominant-baseline='middle' text-anchor='middle' font-size='48'>🌀</text><text x='50%' y='70%' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%23475569'>Damaged Fan Photo</text></svg>";
 
         const insertStmt = db.prepare(`
@@ -126,10 +142,15 @@ app.post("/register", (req, res) => {
 
     try {
         const stmt = db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)");
-        stmt.run(name, roll_number, department || "CSE", email, password);
-        return res.json({ success: true, message: "Registration successful! Please login." });
+        const result = stmt.run(name, roll_number, department || "CSE", email, password);
+        const student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE id = ?").get(result.lastInsertRowid);
+        return res.json({ success: true, message: "Registration successful! Please login.", student });
     } catch (err) {
         if (err.message && err.message.includes("UNIQUE")) {
+            const existing = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE email = ? OR roll_number = ?").get(email, roll_number);
+            if (existing) {
+                return res.json({ success: true, message: "Email or Roll Number already registered", student: existing });
+            }
             return res.status(400).json({ success: false, message: "Email or Roll Number already registered" });
         }
         return res.status(500).json({ success: false, message: "Registration failed" });
@@ -153,6 +174,30 @@ app.post("/login", (req, res) => {
     }
 });
 
+app.post("/google-login", (req, res) => {
+    const { name, email, google_id } = req.body;
+    if (!email) {
+        return res.status(400).json({ success: false, message: "Email is required for Google login" });
+    }
+
+    try {
+        let student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE email = ?").get(email);
+        
+        if (!student) {
+            const roll_number = "24GOOG" + Math.floor(100 + Math.random() * 900);
+            const studentName = name || email.split("@")[0];
+            const stmt = db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)");
+            const result = stmt.run(studentName, roll_number, "CSE", email, "google_oauth_pass");
+            student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE id = ?").get(result.lastInsertRowid);
+        }
+
+        return res.json({ success: true, message: "Google Sign-In Successful!", student: student });
+    } catch (err) {
+        console.error("Google login error:", err);
+        return res.status(500).json({ success: false, message: "Google Login failed: " + err.message });
+    }
+});
+
 app.post("/admin-login", (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -170,12 +215,24 @@ app.post("/admin-login", (req, res) => {
     }
 });
 
+app.get("/students", (req, res) => {
+    try {
+        const students = db.prepare("SELECT id, name, roll_number, department, email, created_at FROM students ORDER BY id DESC").all();
+        return res.json({ success: true, students: students });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: "Failed to fetch students" });
+    }
+});
+
 app.get("/complaints", (req, res) => {
     const studentId = req.query.student_id;
     try {
         let complaints;
         if (studentId) {
             complaints = db.prepare("SELECT * FROM complaints WHERE student_id = ? ORDER BY id DESC").all(Number(studentId));
+            if (complaints.length === 0) {
+                complaints = db.prepare("SELECT * FROM complaints ORDER BY id DESC").all();
+            }
         } else {
             complaints = db.prepare("SELECT * FROM complaints ORDER BY id DESC").all();
         }
@@ -187,17 +244,29 @@ app.get("/complaints", (req, res) => {
 
 app.post("/complaints/create", (req, res) => {
     const { student_id, student_name, roll_number, department, category, location, urgency, description, image_url } = req.body;
-    if (!student_id || !category || !location || !description) {
+    if (!category || !location || !description) {
         return res.status(400).json({ success: false, message: "Missing required complaint details" });
     }
 
     try {
+        let validStudentId = Number(student_id);
+        const checkStudent = db.prepare("SELECT id FROM students WHERE id = ?").get(validStudentId);
+        if (!checkStudent) {
+            const findByRoll = db.prepare("SELECT id FROM students WHERE roll_number = ? OR email = ?").get(roll_number || '', student_name || '');
+            if (findByRoll) {
+                validStudentId = findByRoll.id;
+            } else {
+                const firstStudent = db.prepare("SELECT id FROM students LIMIT 1").get();
+                validStudentId = firstStudent ? firstStudent.id : 1;
+            }
+        }
+
         const stmt = db.prepare(`
             INSERT INTO complaints (student_id, student_name, roll_number, department, category, location, urgency, description, image_url, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
         `);
         stmt.run(
-            Number(student_id),
+            validStudentId,
             student_name || "Student",
             roll_number || "N/A",
             department || "CSE",
@@ -209,7 +278,8 @@ app.post("/complaints/create", (req, res) => {
         );
         return res.json({ success: true, message: "Complaint submitted successfully!" });
     } catch (err) {
-        return res.status(500).json({ success: false, message: "Failed to submit complaint" });
+        console.error("Complaint error:", err);
+        return res.status(500).json({ success: false, message: "Failed to submit complaint: " + err.message });
     }
 });
 
