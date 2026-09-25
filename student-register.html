@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Registration - Campus Maintenance</title>
     <link rel="stylesheet" href="../css/style.css">
+    <!-- Official Google Identity Services SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
@@ -15,17 +17,45 @@
             <h1>Student Registration</h1>
             <p>Create your student account</p>
 
+            <!-- Continue with Google Button -->
+            <button type="button" id="googleLoginBtn" class="btn-google">
+                <svg width="18" height="18" viewBox="0 0 18 18">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"/>
+                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+                </svg>
+                Continue with Google
+            </button>
+
+            <div class="divider">
+                <span>OR REGISTER WITH EMAIL</span>
+            </div>
+
             <div id="alertMessage" class="alert-box" style="display: none;"></div>
 
+            <!-- Manual Student Details Registration Form -->
             <form id="registerForm">
                 <label for="name">Full Name</label>
-                <input type="text" id="name" placeholder="Enter full name" required>
+                <input type="text" id="name" placeholder="Enter full name (e.g., Satya Narayana)" required>
 
                 <label for="roll_number">Roll Number / Student ID</label>
-                <input type="text" id="roll_number" placeholder="Enter roll number (e.g., 24CS101)" required>
+                <input type="text" id="roll_number" placeholder="Enter roll number (e.g., 24IE101)" required>
+
+                <label for="department">Academic Department / Branch</label>
+                <select id="department" required>
+                    <option value="IECT">📱 IECT (Information Engineering & Computational Tech)</option>
+                    <option value="DE">📊 DE (Data Engineering & Data Science)</option>
+                    <option value="CSE">💻 CSE (Computer Science & Engineering)</option>
+                    <option value="ECE">📡 ECE (Electronics & Communication)</option>
+                    <option value="EEE">⚡ EEE (Electrical & Electronics)</option>
+                    <option value="MECH">⚙️ Mechanical Engineering</option>
+                    <option value="CIVIL">🏗️ Civil Engineering</option>
+                    <option value="General">🏫 Hostel / General Campus</option>
+                </select>
 
                 <label for="email">Email Address</label>
-                <input type="email" id="email" placeholder="Enter campus email" required>
+                <input type="email" id="email" placeholder="Enter campus email (e.g., satya@student.edu)" required>
 
                 <label for="password">Password</label>
                 <input type="password" id="password" placeholder="Create a password" required>
@@ -44,12 +74,122 @@
         </div>
     </div>
 
+    <!-- Google Account Selection Modal UI -->
+    <div id="googleAccountModal" class="modal" onclick="closeGoogleModal()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 440px; padding: 28px; border-radius: 16px; text-align: left;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <svg width="36" height="36" viewBox="0 0 18 18" style="margin-bottom: 8px;">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"/>
+                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+                </svg>
+                <h2 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 4px;">Choose a Google Account</h2>
+                <p style="font-size: 0.875rem; color: #6b7280; margin: 0;">Select your device Google account to register for <strong>Campus Maintenance</strong></p>
+            </div>
+
+            <div class="google-accounts-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <!-- Device Google Account Option 1 -->
+                <div onclick="selectGoogleAccount('S.V.S. Narayana', 'svsnarayana22@gmail.com')" 
+                     style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1.5px solid #2563eb; border-radius: 10px; cursor: pointer; background: #eff6ff; transition: background 0.2s;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #ea580c; color: #fff; font-weight: bold; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">S</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; color: #111827; font-size: 0.95rem;">S.V.S. Narayana <span style="font-size: 0.75rem; background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">IECT Dept</span></div>
+                        <div style="color: #4b5563; font-size: 0.825rem;">svsnarayana22@gmail.com (Device Account)</div>
+                    </div>
+                </div>
+
+                <!-- Device Google Account Option 2 -->
+                <div onclick="selectGoogleAccount('Data Engineer Student', 'de@student.edu')" 
+                     style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: background 0.2s;"
+                     onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='transparent'">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #059669; color: #fff; font-weight: bold; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">D</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; color: #111827; font-size: 0.95rem;">Data Engineer Student <span style="font-size: 0.75rem; background: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">DE Dept</span></div>
+                        <div style="color: #6b7280; font-size: 0.825rem;">de@student.edu</div>
+                    </div>
+                </div>
+
+                <!-- Add Custom Device Google Account Option -->
+                <div onclick="promptCustomGoogleAccount()" 
+                     style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px dashed #9ca3af; border-radius: 10px; cursor: pointer; transition: background 0.2s;"
+                     onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #f3f4f6; color: #4b5563; font-weight: bold; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">+</div>
+                    <div>
+                        <div style="font-weight: 700; color: #2563eb; font-size: 0.95rem;">Enter Your Device Google Account</div>
+                        <div style="color: #6b7280; font-size: 0.825rem;">Sign in with any original @gmail.com on device</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: right;">
+                <button type="button" class="btn-sm" onclick="closeGoogleModal()" style="background: #e5e7eb; color: #374151; padding: 8px 16px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        document.getElementById("googleLoginBtn").addEventListener("click", function() {
+            document.getElementById("googleAccountModal").style.display = "flex";
+        });
+
+        window.closeGoogleModal = function() {
+            document.getElementById("googleAccountModal").style.display = "none";
+        };
+
+        async function selectGoogleAccount(name, email) {
+            closeGoogleModal();
+            const alertBox = document.getElementById("alertMessage");
+            alertBox.style.display = "none";
+
+            const roll_number = prompt(`Enter Roll Number for ${name}:`, "24IE" + Math.floor(100 + Math.random() * 900));
+            const department = prompt(`Select Department (IECT, DE, CSE, ECE, EEE, MECH, CIVIL):`, "IECT") || "IECT";
+
+            try {
+                const response = await fetch("/google-login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, email, roll_number, department })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem("student", JSON.stringify(data.student));
+                    alertBox.className = "alert-box success";
+                    alertBox.textContent = `Registration & Google Sign-In Successful! Welcome, ${data.student.name}. Redirecting...`;
+                    alertBox.style.display = "block";
+
+                    setTimeout(() => {
+                        window.location.href = "student-dashboard.html";
+                    }, 600);
+                } else {
+                    alertBox.className = "alert-box error";
+                    alertBox.textContent = data.message || "Registration failed";
+                    alertBox.style.display = "block";
+                }
+            } catch (err) {
+                alertBox.className = "alert-box error";
+                alertBox.textContent = "Server connection error.";
+                alertBox.style.display = "block";
+            }
+        }
+
+        function promptCustomGoogleAccount() {
+            closeGoogleModal();
+            const email = prompt("Enter your original Google Account email on this device:", "yourname@gmail.com");
+            if (!email) return;
+            const name = email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+            selectGoogleAccount(name, email);
+        }
+
+        // Manual Registration Form Handler with Persistent State
         document.getElementById("registerForm").addEventListener("submit", async function(event) {
             event.preventDefault();
 
             const name = document.getElementById("name").value.trim();
             const roll_number = document.getElementById("roll_number").value.trim();
+            const department = document.getElementById("department").value;
             const email = document.getElementById("email").value.trim();
             const password = document.getElementById("password").value.trim();
             const alertBox = document.getElementById("alertMessage");
@@ -60,19 +200,22 @@
                 const response = await fetch("/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name, roll_number, email, password })
+                    body: JSON.stringify({ name, roll_number, department, email, password })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
+                    if (data.student) {
+                        localStorage.setItem("student", JSON.stringify(data.student));
+                    }
                     alertBox.className = "alert-box success";
-                    alertBox.textContent = data.message;
+                    alertBox.textContent = "Registration Successful! Redirecting to Dashboard...";
                     alertBox.style.display = "block";
 
                     setTimeout(() => {
-                        window.location.href = "student-login.html";
-                    }, 1500);
+                        window.location.href = "student-dashboard.html";
+                    }, 800);
                 } else {
                     alertBox.className = "alert-box error";
                     alertBox.textContent = data.message || "Registration failed";

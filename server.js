@@ -71,7 +71,7 @@ function initDb() {
     try { db.exec("ALTER TABLE complaints ADD COLUMN department TEXT DEFAULT 'CSE'"); } catch (e) {}
 
     // Pre-seed Admin Account
-    const checkAdmin = db.prepare("SELECT * FROM admins WHERE email = ?").get("admin@campus.edu");
+    const checkAdmin = db.prepare("SELECT * FROM admins WHERE LOWER(email) = LOWER(?)").get("admin@campus.edu");
     if (!checkAdmin) {
         db.prepare("INSERT INTO admins (name, email, password) VALUES (?, ?, ?)").run(
             "System Admin",
@@ -80,43 +80,25 @@ function initDb() {
         );
     }
 
-    // Pre-seed Demo Students (Ensures login ALWAYS works even after Render container restarts!)
-    const demoStudents = [
-        { name: "John Doe", roll_number: "24CS001", department: "CSE", email: "john@student.edu", password: "student123" },
-        { name: "Satya Narayana", roll_number: "24IE001", department: "IECT", email: "satya@student.edu", password: "satya123" }
+    // Pre-seed default student accounts if not existing
+    const defaultStudents = [
+        { name: "Satya Narayana", roll_number: "24IE001", department: "IECT", email: "satya@student.edu", password: "satya123" },
+        { name: "Data Engineer Student", roll_number: "24DE001", department: "DE", email: "de@student.edu", password: "de123" },
+        { name: "John Doe", roll_number: "24CS001", department: "CSE", email: "john@student.edu", password: "student123" }
     ];
 
-    demoStudents.forEach(s => {
-        const check = db.prepare("SELECT * FROM students WHERE email = ?").get(s.email);
+    defaultStudents.forEach(s => {
+        const check = db.prepare("SELECT * FROM students WHERE LOWER(email) = LOWER(?)").get(s.email);
         if (!check) {
             db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)").run(
-                s.name, s.roll_number, s.department, s.email, s.password
+                s.name, s.roll_number, s.department, s.email.toLowerCase(), s.password
             );
         } else {
-            db.prepare("UPDATE students SET department = ?, roll_number = ? WHERE email = ?").run(s.department, s.roll_number, s.email);
+            db.prepare("UPDATE students SET department = ?, roll_number = ? WHERE LOWER(email) = LOWER(?)").run(s.department, s.roll_number, s.email.toLowerCase());
         }
     });
 
-    // Pre-seed sample complaints across departments
-    const checkComplaints = db.prepare("SELECT COUNT(*) as count FROM complaints").get().count;
-    if (checkComplaints === 0) {
-        const student = db.prepare("SELECT id FROM students WHERE email = ?").get("john@student.edu");
-        const studentId = student ? student.id : 1;
-        const sampleFanPhoto = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23e2e8f0'/><text x='50%' y='45%' dominant-baseline='middle' text-anchor='middle' font-size='48'>🌀</text><text x='50%' y='70%' dominant-baseline='middle' text-anchor='middle' font-size='14' fill='%23475569'>Damaged Fan Photo</text></svg>";
-
-        const insertStmt = db.prepare(`
-            INSERT INTO complaints (student_id, student_name, roll_number, department, category, location, urgency, description, image_url, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        insertStmt.run(studentId, "John Doe", "24CS001", "CSE", "Fan", "CS Lab 1 - Room 204", "High", "Ceiling fan making loud noise.", sampleFanPhoto, "Pending");
-        insertStmt.run(studentId, "John Doe", "24CS001", "CSE", "Light", "CS Lab 3 - Desk 12", "Medium", "Tubelight flickering continuously.", null, "In Progress");
-        insertStmt.run(studentId, "John Doe", "24CS001", "ECE", "WiFi", "ECE Block - DSP Lab", "High", "Wi-Fi router disconnected in lab.", null, "Pending");
-        insertStmt.run(studentId, "John Doe", "24CS001", "EEE", "Light", "Electrical Machine Lab", "High", "Main circuit breaker light tripping.", null, "In Progress");
-        insertStmt.run(studentId, "John Doe", "24CS001", "MECH", "Furniture", "Workshop - Bench 4", "Medium", "Desk wooden leg broken.", null, "Resolved");
-        insertStmt.run(studentId, "John Doe", "24CS001", "CIVIL", "Water", "Civil Block 2nd Floor", "Medium", "Water tap leaking in washroom.", null, "Pending");
-        insertStmt.run(studentId, "John Doe", "24CS001", "General", "Water", "Hostel Block B", "High", "Water cooler not cooling water.", null, "Pending");
-    }
+    // NOTE: All sample mock complaints are removed so Admin Portal only shows real complaints submitted by users!
 }
 
 initDb();
@@ -140,20 +122,26 @@ app.post("/register", (req, res) => {
         return res.status(400).json({ success: false, message: "All fields are required" });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRoll = roll_number.trim();
+    const cleanName = name.trim();
+    const cleanDept = department || "IECT";
+
     try {
         const stmt = db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)");
-        const result = stmt.run(name, roll_number, department || "CSE", email, password);
+        const result = stmt.run(cleanName, cleanRoll, cleanDept, cleanEmail, password);
         const student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE id = ?").get(result.lastInsertRowid);
         return res.json({ success: true, message: "Registration successful! Please login.", student });
     } catch (err) {
         if (err.message && err.message.includes("UNIQUE")) {
-            const existing = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE email = ? OR roll_number = ?").get(email, roll_number);
-            if (existing) {
-                return res.json({ success: true, message: "Email or Roll Number already registered", student: existing });
-            }
-            return res.status(400).json({ success: false, message: "Email or Roll Number already registered" });
+            // Update existing student's password and department if re-registering
+            try {
+                db.prepare("UPDATE students SET password = ?, department = ?, name = ? WHERE LOWER(email) = ? OR roll_number = ?").run(password, cleanDept, cleanName, cleanEmail, cleanRoll);
+            } catch (uErr) {}
+            const existing = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE LOWER(email) = ? OR roll_number = ?").get(cleanEmail, cleanRoll);
+            return res.json({ success: true, message: "Account details updated! Proceeding to login...", student: existing });
         }
-        return res.status(500).json({ success: false, message: "Registration failed" });
+        return res.status(500).json({ success: false, message: "Registration failed: " + err.message });
     }
 });
 
@@ -163,10 +151,23 @@ app.post("/login", (req, res) => {
         return res.status(400).json({ success: false, message: "Email and password are required" });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
-        const student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE email = ? AND password = ?").get(email, password);
+        let student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE LOWER(email) = ? AND password = ?").get(cleanEmail, password);
+        
+        // Fallback check if student exists by email (e.g. initial Google login or password case match)
         if (!student) {
-            return res.status(401).json({ success: false, message: "Invalid email or password" });
+            const checkUser = db.prepare("SELECT id, name, roll_number, department, email, password FROM students WHERE LOWER(email) = ?").get(cleanEmail);
+            if (checkUser && (checkUser.password === "google_oauth_pass" || checkUser.password === password)) {
+                // Auto update password for user
+                db.prepare("UPDATE students SET password = ? WHERE id = ?").run(password, checkUser.id);
+                student = { id: checkUser.id, name: checkUser.name, roll_number: checkUser.roll_number, department: checkUser.department, email: checkUser.email };
+            }
+        }
+
+        if (!student) {
+            return res.status(401).json({ success: false, message: "Invalid email or password. Please check your credentials or register." });
         }
         return res.json({ success: true, message: "Login successful!", student: student });
     } catch (err) {
@@ -175,20 +176,27 @@ app.post("/login", (req, res) => {
 });
 
 app.post("/google-login", (req, res) => {
-    const { name, email, google_id } = req.body;
+    const { name, email, google_id, department, roll_number } = req.body;
     if (!email) {
         return res.status(400).json({ success: false, message: "Email is required for Google login" });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
-        let student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE email = ?").get(email);
+        let student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE LOWER(email) = ?").get(cleanEmail);
         
+        const finalRoll = roll_number || (student ? student.roll_number : "24IE" + Math.floor(100 + Math.random() * 900));
+        const finalDept = department || (student ? student.department : "IECT");
+        const studentName = name || (student ? student.name : cleanEmail.split("@")[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+
         if (!student) {
-            const roll_number = "24GOOG" + Math.floor(100 + Math.random() * 900);
-            const studentName = name || email.split("@")[0];
             const stmt = db.prepare("INSERT INTO students (name, roll_number, department, email, password) VALUES (?, ?, ?, ?, ?)");
-            const result = stmt.run(studentName, roll_number, "CSE", email, "google_oauth_pass");
+            const result = stmt.run(studentName, finalRoll, finalDept, cleanEmail, "google_oauth_pass");
             student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE id = ?").get(result.lastInsertRowid);
+        } else {
+            db.prepare("UPDATE students SET name = ?, roll_number = ?, department = ? WHERE id = ?").run(studentName, finalRoll, finalDept, student.id);
+            student = db.prepare("SELECT id, name, roll_number, department, email FROM students WHERE id = ?").get(student.id);
         }
 
         return res.json({ success: true, message: "Google Sign-In Successful!", student: student });
@@ -204,8 +212,10 @@ app.post("/admin-login", (req, res) => {
         return res.status(400).json({ success: false, message: "Email and password are required" });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
-        const admin = db.prepare("SELECT id, name, email FROM admins WHERE email = ? AND password = ?").get(email, password);
+        const admin = db.prepare("SELECT id, name, email FROM admins WHERE LOWER(email) = ? AND password = ?").get(cleanEmail, password);
         if (!admin) {
             return res.status(401).json({ success: false, message: "Invalid admin credentials" });
         }

@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Campus Maintenance</title>
     <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="style.css">
 
     <!-- STRICT AUTHENTICATION GUARD -->
     <script>
@@ -75,6 +74,8 @@
                     <!-- Academic Department / Branch Filter -->
                     <select id="branchFilter" class="status-select" style="padding: 7px 12px; font-weight: 700; border-color: #2563eb;">
                         <option value="all">🎓 All Academic Branches</option>
+                        <option value="IECT">📱 IECT (Info Engineering & Computational Tech)</option>
+                        <option value="DE">📊 DE (Data Engineering & Science)</option>
                         <option value="CSE">💻 CSE Department</option>
                         <option value="ECE">📡 ECE Department</option>
                         <option value="EEE">⚡ EEE Department</option>
@@ -124,6 +125,33 @@
                     <tbody id="adminComplaintsTable">
                         <tr>
                             <td colspan="11" class="text-center">Loading complaints...</td>
+                        </tr>
+                    </tbody>
+                </table>
+        </div>
+
+        <!-- Registered Students Directory -->
+        <div class="dashboard-card margin-top">
+            <div class="section-header">
+                <h2>👥 Registered Students Directory</h2>
+                <button id="refreshStudentsBtn" class="btn-sm" onclick="loadStudents()">🔄 Refresh Students</button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Student Name</th>
+                            <th>Roll Number</th>
+                            <th>Department / Branch</th>
+                            <th>Email Address</th>
+                            <th>Registered Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminStudentsTable">
+                        <tr>
+                            <td colspan="6" class="text-center">Loading registered students...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -224,7 +252,7 @@
 
             // Apply Branch Filter
             if (currentBranchFilter !== "all") {
-                filtered = filtered.filter(c => (c.department || 'CSE') === currentBranchFilter);
+                filtered = filtered.filter(c => (c.department || 'IECT') === currentBranchFilter);
             }
 
             // Apply Category Filter
@@ -246,7 +274,7 @@
                 <tr>
                     <td>#${c.id}</td>
                     <td>${c.image_url ? `<img src="${c.image_url}" class="table-thumb" onclick="openImageModal('${c.image_url}')" title="Click to enlarge">` : '<span class="text-muted">No Photo</span>'}</td>
-                    <td><span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:800;">${c.department || 'CSE'}</span></td>
+                    <td><span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:800;">${c.department || 'IECT'}</span></td>
                     <td>${c.student_name || 'Student'}</td>
                     <td><strong>${c.roll_number || 'N/A'}</strong></td>
                     <td>${c.category}</td>
@@ -331,9 +359,36 @@
             });
         });
 
+        // Load Registered Students List
+        async function loadStudents() {
+            const tableBody = document.getElementById("adminStudentsTable");
+            try {
+                const response = await fetch("/students");
+                const data = await response.json();
+
+                if (data.success && data.students.length > 0) {
+                    tableBody.innerHTML = data.students.map(s => `
+                        <tr>
+                            <td>#${s.id}</td>
+                            <td><strong>${s.name}</strong></td>
+                            <td><code>${s.roll_number}</code></td>
+                            <td><span class="badge" style="background:#e0e7ff; color:#3730a3; font-weight:800;">${s.department || 'IECT'}</span></td>
+                            <td>${s.email}</td>
+                            <td>${s.created_at ? new Date(s.created_at).toLocaleDateString() : 'N/A'}</td>
+                        </tr>
+                    `).join("");
+                } else {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No students registered yet.</td></tr>`;
+                }
+            } catch (err) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error loading students list.</td></tr>`;
+            }
+        }
+
         // Initial Load
         loadStats();
         loadComplaints();
+        loadStudents();
     </script>
 
 </body>
